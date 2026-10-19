@@ -2,13 +2,79 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:wisata_candi/models/candi.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   final Candi candi;
 
   const DetailScreen({super.key, required this.candi});
 
   @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  late bool _isFavorite;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorite = widget.candi.isFavorite;
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.black.withOpacity(0.85),
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            alignment: Alignment.topRight,
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                      errorWidget: (context, url, error) => const Icon(
+                        Icons.error,
+                        color: Colors.red,
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: CircleAvatar(
+                  backgroundColor: Colors.black54,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final candi = widget.candi;
+
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
@@ -42,10 +108,19 @@ class DetailScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
-                          onPressed: () {},
-                          icon: const Icon(
-                            Icons.arrow_back,
-                          ),
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Ini adalah halaman utama'),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.arrow_back),
                         ),
                       ),
                     ),
@@ -70,8 +145,27 @@ class DetailScreen extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.favorite_border),
+                            onPressed: () {
+                              setState(() {
+                                _isFavorite = !_isFavorite;
+                                widget.candi.isFavorite = _isFavorite;
+                              });
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _isFavorite
+                                        ? '${candi.name} ditambahkan ke favorit'
+                                        : '${candi.name} dihapus dari favorit',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            icon: Icon(
+                              _isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: _isFavorite ? Colors.red : null,
+                            ),
                           ),
                         ],
                       ),
@@ -130,10 +224,30 @@ class DetailScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       Text(
                         candi.description,
-                        style: const TextStyle(fontSize: 14),
+                        maxLines: _isExpanded ? null : 4,
+                        overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, height: 1.4),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isExpanded = !_isExpanded;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            _isExpanded ? 'Tutup selengkapnya' : 'Baca selengkapnya...',
+                            style: TextStyle(
+                              color: Colors.deepPurple.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -159,10 +273,11 @@ class DetailScreen extends StatelessWidget {
                           scrollDirection: Axis.horizontal,
                           itemCount: candi.imageUrls.length,
                           itemBuilder: (context, index) {
+                            final imgUrl = candi.imageUrls[index];
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: GestureDetector(
-                                onTap: () {},
+                                onTap: () => _showFullScreenImage(imgUrl),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(12),
@@ -174,7 +289,7 @@ class DetailScreen extends StatelessWidget {
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
                                     child: CachedNetworkImage(
-                                      imageUrl: candi.imageUrls[index],
+                                      imageUrl: imgUrl,
                                       width: 120,
                                       height: 120,
                                       fit: BoxFit.cover,
@@ -182,6 +297,13 @@ class DetailScreen extends StatelessWidget {
                                         width: 120,
                                         height: 120,
                                         color: Colors.deepPurple[50],
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                        ),
                                       ),
                                       errorWidget: (context, url, error) => const Icon(Icons.error),
                                     ),
